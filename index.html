@@ -808,20 +808,40 @@
             }
             async connect() {
                 logger.info(`Connecting to Twitch chat for channel: ${this.channel}`);
-                await emoteCache.fetch7TVEmotes(this.channelId);
-                const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
-                ws.onopen = () => {
-                    ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership');
-                    ws.send('PASS SCHMOOPIIE');
-                    ws.send('NICK justinfan12345');
-                    ws.send(`JOIN #${this.channel}`);
+
+                this.ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
+
+                this.ws.onopen = () => {
+                    this.ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership');
+                    this.ws.send('PASS SCHMOOPIIE');
+                    this.ws.send('NICK justinfan12345');
+                    this.ws.send(`JOIN #${this.channel}`);
                 };
-                ws.onmessage = async (event) => {
+                this.ws.onmessage = async (event) => {
                     const parsedMessage = this.parseMessage(event.data);
                     if (parsedMessage) {
                         this.displayMessage(parsedMessage);
                     }
                 };
+                this.ws.onclose = () => {
+                    logger.warn('Connection lost, attempting to reconnect...');
+                    setTimeout(() => {
+                        this.connect();
+                    }, 5000);
+                };
+
+                this.ws.onerror = (error) => {
+                    logger.error('WebSocket error:', error);
+                    this.ws.close();
+                };
+                // Загружаем эмоуты после установки обработчиков WebSocket
+                try {
+                    await emoteCache.fetch7TVEmotes(this.channelId);
+                    logger.info('7TV emotes loaded successfully');
+                } catch (error) {
+                    logger.error('Failed to load 7TV emotes:', error);
+                }
+
             }
             parseEmotes(emoteTag, message) {
                 if (!emoteTag || emoteTag === true) return [];
