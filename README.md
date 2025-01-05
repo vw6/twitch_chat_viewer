@@ -1,6 +1,6 @@
 # Простой чат для OBS 
 
-Выводит чат твич в обс для показа на трансляции. ![alt text](image.png)
+Выводит чат твич в обс для показа на трансляции, является открытой реализацией RutonyChat. ![alt text](image.png)
 
 ```
 file:///D:/obs/scripts/twitch_chat_viewer/index.html?channel=foodoch&channelId=151943268&typewriterEffect=true&typewriterSpeed=10&fontFamily=Segoe%20UI&fontSize=20px&debug=true
