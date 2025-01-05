@@ -15,4 +15,5 @@ file:///D:/obs/scripts/twitch_chat_viewer/index.html?channel=foodoch&channelId=1
 | typewriterSpeed  | 10 | Задает задержку появления символов |
 | fontFamily  | Segoe UI | Задает шрифт текста |
 | fontSize  | 20px | Задает размер текста |
+| win11 | true | Включает визуальный стиль окна Windows 11 |
 | debug  | true | Включает режим отладки, испрользуется только в полноценных браузерах через F12 |
