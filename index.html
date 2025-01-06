@@ -64,6 +64,7 @@
 
         /* Добавляем перенос текста и ограничение ширины блока сообщения */
         .chat-message {
+            position: relative;
             animation: slideIn 0.3s ease-out;
             opacity: 1;
             padding: 8px 12px;
@@ -375,12 +376,45 @@
             border-right: 4px solid #007bff;
         }
 
-        .raid-message {
-            background-color: rgba(46, 204, 113, 0.1);
-            border-left: 4px solid #2ecc71;
-            border-right: 4px solid #2ecc71;
+        .reply-parent-preview {
+            font-size: 0.8em;
+            color: #adadb8;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: rgba(255, 165, 0, 0.1);
+            border-left: 2px solid #FFA500;
+            border-right: 2px solid #FFA500;
+            border-radius: 4px;
         }
 
+        .reply-arrow {
+            color: #adadb8;
+            font-size: 1.1em;
+        }
+
+        .reply-parent-name {
+            font-weight: 600;
+            margin-right: 4px;
+        }
+
+        .reply-parent-text {
+            color: #adadb8;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 300px;
+            opacity: 0.9;
+        }
+        .chat-message.reply-message {
+            border-left: 2px solid #FFA500;
+            border-right: 2px solid #FFA500;
+            padding-left: 8px;
+            padding-right: 8px;
+            background: rgba(255, 165, 0, 0.05);
+        }
 
         @keyframes firstMessageHighlight {
             0% {
@@ -1174,8 +1208,8 @@
                 };
 
                 this.cleanupConfig = {
-                    minMessagesBeforeCleanup: 15,
-                    maxMessagesBeforeForceCleanup: 30,
+                    minMessagesBeforeCleanup: 10,
+                    maxMessagesBeforeForceCleanup: 35,
                     cleanupInterval: 1000,
                     performanceThreshold: 30,
                     messageRetentionTime: 15000,
@@ -1466,10 +1500,46 @@
                 const wasAtBottom = this.isScrolledToBottom(chatContainer);
                 const messageElement = document.createElement('div');
                 messageElement.className = 'chat-message';
-                const badgesContainer = document.createElement('span');
-                badgesContainer.className = 'badges-container';
+                messageElement.id = `message-${parsedMessage.tags.id}`;
                 messageElement.dataset.timestamp = Date.now().toString();
 
+                // Если это ответ на сообщение, добавляем превью
+                if (parsedMessage.tags['reply-parent-msg-id']) {
+                    const replyPreview = document.createElement('div');
+                    replyPreview.className = 'reply-parent-preview';
+                    
+                    const replyArrow = document.createElement('span');
+                    replyArrow.className = 'reply-arrow';
+                    replyArrow.textContent = '↱';
+                    
+                    const parentName = document.createElement('span');
+                    parentName.className = 'reply-parent-name';
+                    parentName.textContent = parsedMessage.tags['reply-parent-display-name'] || 'User';
+                    parentName.style.color = this.userColors.get(parsedMessage.tags['reply-parent-display-name'].toLowerCase()) || '#adadb8';
+                    
+                    const parentText = document.createElement('span');
+                    parentText.className = 'reply-parent-text';
+                    // Исправляем обработку текста родительского сообщения
+                    let originalText = parsedMessage.tags['reply-parent-msg-body'] || '';
+                    originalText = originalText
+                        .replace(/\\s/g, ' ')  // Заменяем \s на пробел
+                        .replace(/\\n/g, ' ')  // Заменяем \n на пробел
+                        .replace(/\\r/g, ' ')  // Заменяем \r на пробел
+                        .replace(/\\t/g, ' ')  // Заменяем \t на пробел
+                        .replace(/\\['"]/g, function(match) { // Обрабатываем экранированные кавычки
+                            return match.charAt(1);
+                        })
+                        .trim(); // Удаляем лишние пробелы в начале и конце
+                    
+                    parentText.textContent = originalText;
+                    
+                    replyPreview.appendChild(replyArrow);
+                    replyPreview.appendChild(parentName);
+                    replyPreview.appendChild(parentText);
+                    messageElement.appendChild(replyPreview);
+                }
+
+                // Добавляем классы для специальных сообщений
                 if (parsedMessage.tags['first-msg'] === '1') {
                     messageElement.classList.add('first-message');
                 }
@@ -1483,6 +1553,7 @@
                     messageElement.classList.add('raid-message');
                     logger.info(`Raid detected with ${parsedMessage.tags['msg-param-viewerCount']} viewers`);
                 }
+
                 const normalizedChannel = this.channel.toLowerCase();
                 const normalizedMessage = parsedMessage.message.toLowerCase();
                 if (normalizedMessage.includes(normalizedChannel)) {
@@ -1490,7 +1561,9 @@
                     messageElement.classList.add('highlighted-message');
                 }
 
-                // Проверяем, что badges существует и является массивом
+                // Создаем и добавляем бейджи
+                const badgesContainer = document.createElement('span');
+                badgesContainer.className = 'badges-container';
                 if (Array.isArray(parsedMessage.badges) && parsedMessage.badges.length > 0) {
                     parsedMessage.badges.forEach((badge, index) => {
                         const [badgeType, badgeVersion] = badge.split('/');
@@ -1501,8 +1574,7 @@
                             badgeImg.alt = badgeType;
                             badgeImg.className = 'chat-badge';
                             badgesContainer.appendChild(badgeImg);
-                            
-                            // Добавляем пробел после каждого бейджа, кроме последнего
+
                             if (index < parsedMessage.badges.length - 1) {
                                 const space = document.createTextNode(' ');
                                 badgesContainer.appendChild(space);
@@ -1510,18 +1582,22 @@
                         }
                     });
                 }
+
+                // Создаем элементы имени пользователя и содержимого сообщения
                 const usernameElement = document.createElement('span');
                 usernameElement.className = 'username';
                 usernameElement.textContent = parsedMessage.tags['display-name'] || parsedMessage.username;
                 usernameElement.style.color = parsedMessage.tags.color || 'var(--default-name-color)';
+
                 const messageContent = document.createElement('div');
                 messageContent.className = 'message-content';
 
+                // Собираем сообщение
                 messageElement.appendChild(badgesContainer);
                 messageElement.appendChild(usernameElement);
                 messageElement.appendChild(messageContent);
-                chatContainer.appendChild(messageElement);
 
+                // Обрабатываем содержимое сообщения
                 await processMessageContent(
                     messageContent,
                     parsedMessage.message,
@@ -1530,20 +1606,18 @@
                     this.typewriterSpeed,
                     this.userColors
                 );
-                chatContainer.appendChild(messageElement);
-                // Прокручиваем к новому сообщению
-                messageElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                // Дополнительно обеспечиваем прокрутку контейнера
+
+                // Добавляем сообщение в контейнер
                 chatContainer.appendChild(messageElement);
 
-                // Проверяем необходимость очистки при высокой нагрузке
-                if (this.messageStats.messagesPerSecond > 30) {
-                    this.adaptiveCleanup();
-                }
-
-                // Прокручиваем только если были внизу до добавления сообщения
+                // Управление прокруткой
                 if (wasAtBottom && !this.isUserScrolling) {
                     chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+
+                // Очистка при необходимости
+                if (this.messageStats.messagesPerSecond > 30) {
+                    this.adaptiveCleanup();
                 }
             }
         }
@@ -1563,11 +1637,11 @@
 
         // Создаем чат
         const chat = new TwitchChat(
-            channel,
-            channelId,
-            isTypewriterEffect,
-            typewriterSpeed,
-            fontSize,
+            channel, 
+            channelId, 
+            isTypewriterEffect, 
+            typewriterSpeed, 
+            fontSize, 
             fontFamily,
             logger,
             win11Style
